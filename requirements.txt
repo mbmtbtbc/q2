@@ -5,3 +5,4 @@ scipy>=1.11
 numpy>=1.24
 pandas>=2.0
 plotly>=5.20
+pandapower>=2.14  # optional: only needed for qgrid.graph.powerflow_validation baseline
