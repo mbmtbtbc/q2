@@ -68,7 +68,7 @@ def run(source="ieee33", seed_edge=(7, 8), source_bus=1, target_bus=18,
     qw = ContinuousTimeQuantumWalk(G0)
     cw = ClassicalContinuousRandomWalk(G0)
     times = np.linspace(0, 6, 41)
-    probs_q = qw.evolve_series(source_bus, times)
+    probs_q, q_unitarity = qw.evolve_series(source_bus, times, return_unitarity=True)
     probs_c = cw.evolve_series(source_bus, times)
     nodes_sorted = qw.nodes
     dist_from_source = np.array([nx.shortest_path_length(G0, source_bus, n) for n in nodes_sorted], dtype=float)
@@ -80,6 +80,7 @@ def run(source="ieee33", seed_edge=(7, 8), source_bus=1, target_bus=18,
         "nodes_order": nodes_sorted,
         "times": times.tolist(),
         "quantum_probs": probs_q.tolist(),
+        "quantum_unitarity": q_unitarity.tolist(),
         "classical_probs": probs_c.tolist(),
         "benchmark": npify(bench),
     }
@@ -94,6 +95,7 @@ def run(source="ieee33", seed_edge=(7, 8), source_bus=1, target_bus=18,
     dm_metrics = [dw.metrics(rho) for rho in series]
     density_payload = {
         "times": dtimes.tolist(),
+        "trace": [m["trace"] for m in dm_metrics],
         "purity": [m["purity"] for m in dm_metrics],
         "entropy": [m["von_neumann_entropy"] for m in dm_metrics],
         "populations": [m["populations"].tolist() for m in dm_metrics],
@@ -106,7 +108,10 @@ def run(source="ieee33", seed_edge=(7, 8), source_bus=1, target_bus=18,
     ranking = criticality_ranking(G0)
 
     # ---------- 5. cascading failure ----------
-    Gf, snaps, log = simulate_cascade(G0, seed_edges=[seed_edge], overload_threshold=1.0)
+    Gf, snaps, log = simulate_cascade(
+        G0, seed_edges=[seed_edge], overload_threshold=1.0,
+        alpha=0.5, beta=0.2, gamma=0.3,
+    )
     impact = cascade_impact_summary(Gf)
     deenergized = [n for n, d in Gf.nodes(data=True) if not d.get("energized", True)]
 

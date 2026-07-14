@@ -21,10 +21,16 @@ def trip_node(G, n):
 
 
 def simulate_cascade(G: nx.Graph, seed_edges=None, seed_nodes=None,
-                      overload_threshold=1.0, max_rounds=20, reencode_weights=True):
+                      overload_threshold=1.0, max_rounds=20, reencode_weights=True,
+                      alpha=None, beta=None, gamma=None):
     """
     Returns a list of "snapshots" (one per round) each = deep-copied graph state,
     plus a trip log [(round, kind, element)] for the animation/dashboard.
+
+    If `reencode_weights` is True, the optional alpha/beta/gamma weights are used
+    so cascade-weight updates preserve the same quantum-weight mix as the input
+    graph. If False, failed edges still get q_weight=0 but existing weights are
+    otherwise preserved.
     """
     H = copy.deepcopy(G)
     log = []
@@ -39,7 +45,16 @@ def simulate_cascade(G: nx.Graph, seed_edges=None, seed_nodes=None,
 
     H = approximate_power_flow(H)
     if reencode_weights:
-        H = encode_quantum_weights(H)
+        H = encode_quantum_weights(
+            H,
+            alpha=0.5 if alpha is None else alpha,
+            beta=0.2 if beta is None else beta,
+            gamma=0.3 if gamma is None else gamma,
+        )
+    else:
+        for u, v, d in H.edges(data=True):
+            if d["status"] == "failed":
+                d["q_weight"] = 0.0
     snapshots.append(copy.deepcopy(H))
 
     for rnd in range(1, max_rounds + 1):
@@ -52,7 +67,16 @@ def simulate_cascade(G: nx.Graph, seed_edges=None, seed_nodes=None,
             log.append((rnd, "line", (u, v)))
         H = approximate_power_flow(H)
         if reencode_weights:
-            H = encode_quantum_weights(H)
+            H = encode_quantum_weights(
+                H,
+                alpha=0.5 if alpha is None else alpha,
+                beta=0.2 if beta is None else beta,
+                gamma=0.3 if gamma is None else gamma,
+            )
+        else:
+            for u, v, d in H.edges(data=True):
+                if d["status"] == "failed":
+                    d["q_weight"] = 0.0
         snapshots.append(copy.deepcopy(H))
 
     # mark isolated (de-energized) buses: not connected to slack in active subgraph

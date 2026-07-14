@@ -69,7 +69,10 @@ def run(source="powercascade", topology_csv=None, load_csv=None,
     )
 
     # ---------- 2. reroute baselines vs QAOA (same scenario as run_pipeline.py) ----------
-    Gf, snaps, log = simulate_cascade(G0, seed_edges=[seed_edge], overload_threshold=1.0)
+    Gf, snaps, log = simulate_cascade(
+        G0, seed_edges=[seed_edge], overload_threshold=1.0,
+        alpha=0.5, beta=0.2, gamma=0.3,
+    )
     qw_post = ContinuousTimeQuantumWalk(Gf)
     occ_post = qw_post.occupation_at(slack, t=3.0)
     tie_candidates = [(u, v) for u, v, d in Gf.edges(data=True) if d.get("is_tie_switch")]

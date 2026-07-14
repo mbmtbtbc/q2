@@ -101,6 +101,7 @@ class DensityMatrixWalk:
     def metrics(rho):
         dm = DensityMatrix(rho)
         return {
+            "trace": float(np.real(np.trace(rho))),
             "purity": float(np.real(purity(dm))),
             "von_neumann_entropy": float(entropy(dm, base=2)),
             "populations": np.real(np.diag(rho)),

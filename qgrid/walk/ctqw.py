@@ -53,12 +53,17 @@ class ContinuousTimeQuantumWalk:
         """psi(t) = exp(-i H t) psi0, via sparse expm-action (exact, fast)."""
         return expm_multiply(-1j * self.H_sparse * t, psi0)
 
-    def evolve_series(self, source_node, times):
+    def evolve_series(self, source_node, times, return_unitarity=False):
         psi0 = self.initial_state(source_node)
         probs = np.zeros((len(times), self.N))
+        unitarity = np.zeros(len(times), dtype=float) if return_unitarity else None
         for k, t in enumerate(times):
             psi_t = self.evolve(psi0, t)
             probs[k] = np.abs(psi_t) ** 2
+            if return_unitarity:
+                unitarity[k] = float(np.sum(probs[k]))
+        if return_unitarity:
+            return probs, unitarity
         return probs  # shape (T, N), rows sum to 1
 
     def propagator(self, t):

@@ -73,7 +73,7 @@ def initialize():
     qw = ContinuousTimeQuantumWalk(G0)
     cw = ClassicalContinuousRandomWalk(G0)
     times = np.linspace(0, 6, 21)
-    probs_q = qw.evolve_series(source_bus, times)
+    probs_q, q_unitarity = qw.evolve_series(source_bus, times, return_unitarity=True)
     probs_c = cw.evolve_series(source_bus, times)
     nodes_sorted = qw.nodes
     dist_from_source = np.array([nx.shortest_path_length(G0, source_bus, n) for n in nodes_sorted], dtype=float)
@@ -83,6 +83,7 @@ def initialize():
         "nodes_order": nodes_sorted,
         "times": times.tolist(),
         "quantum_probs": probs_q.tolist(),
+        "quantum_unitarity": q_unitarity.tolist(),
         "classical_probs": probs_c.tolist(),
         "benchmark": npify(bench),
     }
@@ -97,6 +98,7 @@ def initialize():
     dm_metrics = [dw.metrics(rho) for rho in series]
     density_payload = {
         "times": dtimes.tolist(),
+        "trace": [m["trace"] for m in dm_metrics],
         "purity": [m["purity"] for m in dm_metrics],
         "entropy": [m["von_neumann_entropy"] for m in dm_metrics],
         "populations": [m["populations"].tolist() for m in dm_metrics],
@@ -152,7 +154,10 @@ def simulate():
         return jsonify({"error": f"Edge ({u}, {v}) does not exist in graph"}), 404
 
     # 1. Cascade Simulation
-    Gf, snaps, log = simulate_cascade(G0, seed_edges=[(u, v)], overload_threshold=1.0)
+    Gf, snaps, log = simulate_cascade(
+        G0, seed_edges=[(u, v)], overload_threshold=1.0,
+        alpha=0.5, beta=0.2, gamma=0.3,
+    )
     impact = cascade_impact_summary(Gf)
     deenergized = [n for n, d in Gf.nodes(data=True) if not d.get("energized", True)]
 
@@ -194,7 +199,8 @@ def simulate():
         "tie_candidates": [list(t) for t in tie_candidates],
         "qaoa_occupation_signal": npify(occ),
         "qaoa_decision": npify(decision),
-        "qaoa_optimal_cost": float(qaoa_info["optimal_cost"]),
+        "qaoa_optimal_cost": float(qaoa_info.get("optimal_cost", 0.0)),
+        "qaoa_info": npify(qaoa_info),
         "closed_switches": [list(c) for c in closed],
         "recovered_buses": recovered,
         "still_down_buses": [n for n in deenergized if n not in energized_now],

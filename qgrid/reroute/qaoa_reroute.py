@@ -32,11 +32,15 @@ from __future__ import annotations
 import numpy as np
 import itertools
 import networkx as nx
-from qiskit_aer import AerSimulator
+from time import perf_counter
 from qiskit_aer.primitives import SamplerV2 as AerSampler
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
 from scipy.optimize import minimize
+
+QUANTUM_SIMULATION_CONTEXT = (
+    "qiskit-aer statevector simulator on CPU; classical simulation of a "
+    "quantum-inspired optimization algorithm, not execution on quantum hardware."
+)
 
 
 def build_qubo(G: nx.Graph, tie_candidates, quantum_occupation, overload_penalty=5.0,
@@ -118,10 +122,25 @@ def solve_qaoa_reroute(h, J, p=2, shots=2048, maxiter=60, seed=42):
     """
     K = len(h)
     if K == 0:
-        return [], {}
+        return [], {
+            "optimal_cost": 0.0,
+            "counts": {},
+            "gammas": [],
+            "betas": [],
+            "cost_history": [],
+            "qaoa_runtime_seconds": 0.0,
+            "nfev": 0,
+            "nit": 0,
+            "success": True,
+            "message": "no tie-candidates available for QAOA",
+            "simulation_context": QUANTUM_SIMULATION_CONTEXT,
+        }
+
     h_z, J_z, offset = qubo_to_ising(h, J)
     sampler = AerSampler()
     rng = np.random.default_rng(seed)
+
+    cost_history = []
 
     def objective(params):
         gammas, betas = params[:p], params[p:]
@@ -129,10 +148,14 @@ def solve_qaoa_reroute(h, J, p=2, shots=2048, maxiter=60, seed=42):
         job = sampler.run([qc], shots=shots)
         result = job.result()[0]
         counts = result.data.meas.get_counts()
-        return _expected_cost(counts, h_z, J_z, offset, shots)
+        cost = _expected_cost(counts, h_z, J_z, offset, shots)
+        cost_history.append(float(cost))
+        return cost
 
     x0 = rng.uniform(0, np.pi, size=2 * p)
+    start = perf_counter()
     res = minimize(objective, x0, method="COBYLA", options={"maxiter": maxiter})
+    qaoa_runtime_seconds = perf_counter() - start
 
     gammas, betas = res.x[:p], res.x[p:]
     qc = qaoa_circuit(K, h_z, J_z, gammas, betas)
@@ -140,7 +163,19 @@ def solve_qaoa_reroute(h, J, p=2, shots=2048, maxiter=60, seed=42):
     counts = job.result()[0].data.meas.get_counts()
     best_bits = max(counts, key=counts.get)
     decision = {i: int(b) for i, b in enumerate(best_bits[::-1])}  # 1 = close this tie switch
-    return decision, {"optimal_cost": res.fun, "counts": counts, "gammas": gammas, "betas": betas}
+    return decision, {
+        "optimal_cost": float(res.fun),
+        "counts": counts,
+        "gammas": gammas,
+        "betas": betas,
+        "cost_history": cost_history,
+        "qaoa_runtime_seconds": float(qaoa_runtime_seconds),
+        "nfev": int(res.nfev),
+        "nit": int(getattr(res, "nit", -1)),
+        "success": bool(res.success),
+        "message": str(res.message),
+        "simulation_context": QUANTUM_SIMULATION_CONTEXT,
+    }
 
 
 def apply_reroute(G: nx.Graph, tie_candidates, decision):

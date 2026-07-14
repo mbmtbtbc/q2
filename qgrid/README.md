@@ -83,9 +83,18 @@ w_ij = α · admittance_term_ij + β · capacity_term_ij + γ · headroom_term_i
 
 ```bash
 pip install qiskit qiskit-aer networkx scipy numpy plotly pandas --break-system-packages
-python3 -m qgrid.run_pipeline          # writes qgrid_data.json
-# then rebuild the dashboard (see build_dashboard.py) to embed fresh data
+python3 -m qgrid.run_pipeline          # writes qgrid_data.json for the dashboard
+python3 app.py                        # starts the Flask dashboard server on http://127.0.0.1:5000
 ```
+
+Then open `http://127.0.0.1:5000` in a browser. The dashboard has tabs for:
+- `Network & Quantum Weights`
+- `CTQW vs Classical Baseline`
+- `Open-System Noise (Decoherence)`
+- `Metrics & Diagnostics` (unitarity + density trace + QAOA convergence)
+- `Interactive Resilience Sandbox` (run a failure simulation and view QAOA solver diagnostics)
+
+If you change source data or parameters, rerun `python3 -m qgrid.run_pipeline` and refresh the browser. `build_dashboard.py` can also embed updated JSON into a standalone `dashboard.html` if you prefer an offline static report.
 
 ## Swapping in the real datasets
 
